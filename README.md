@@ -1,2 +1,2 @@
-# acaros
-Analisis diversidad de acaros
+# Ácaros
+Análisis diversidad de ácaros
