@@ -36,9 +36,6 @@ matriz.sitio <- unique(acaros[,c("id","Lugar","Mes")])
 matriz.sitio <- matriz.sitio[order(matriz.sitio$id),]
 head(matriz.sitio)
 
-
-# matriz.num <- decostand(matriz.num, method = "hellinger")
-
 # matriz de divergencia
 dist_matrix <- vegdist(matriz.num, method = "bray")
 dist_matrix
@@ -78,17 +75,8 @@ resultado_permanova_mes <- adonis2(matriz.num ~ Mes,
                                data = matriz.sitio, 
                                method = "bray", 
                                permutations = 999)
+
 print(resultado_permanova_mes)
-
-matriz.sitio$periodo <- 1
-matriz.sitio$periodo[matriz.sitio$Mes ==3 | matriz.sitio$Mes ==4] <- 2
-matriz.sitio$periodo[matriz.sitio$Mes ==5 | matriz.sitio$Mes ==6] <- 3
-
-resultado_permanova_periodo <- adonis2(matriz.num ~ periodo, 
-                                   data = matriz.sitio, 
-                                   method = "bray", 
-                                   permutations = 999)
-print(resultado_permanova_periodo)
 
 resultado_permanova_lugar_mes <- adonis2(matriz.num ~ Lugar+Mes, 
                                    data = matriz.sitio, 
@@ -110,13 +98,6 @@ nmds
 nmds$stress
 scores_nmds <- as.data.frame(scores(nmds, display = "sites"))
 scores_nmds$SampleID <- rownames(scores_nmds)
-stressplot(nmds)
-
-gof <- goodness(nmds)
-
-# Graficar: burbujas más grandes indican sitios PEOR representados
-plot(nmds, display = "sites", type = "t", main = "Bondad de ajuste por sitio")
-points(nmds, display = "sites", cex = gof * 100) # El
 
 # une metadata (ajusta nombres a tu objeto real)
 scores_nmds <- scores_nmds %>%
@@ -141,33 +122,13 @@ nmds_coords$periodo[nmds_coords$Mes==5 | nmds_coords$Mes==6] <- "3" # Agregar co
 
 nmds_coords$Lugar <- matriz.sitio$Lugar
 # grafico
-
-library(vegan)
-
-# matriz de comunidad (muestras x taxa)
-comm <- matriz.num
-
-# distancia (ej. Bray)
-d <- vegdist(comm, method = "bray")
-
-# NMDS
-set.seed(1)
-nmds <- metaMDS(comm, distance = "bray", k = 2, trymax = 200)
-
-# PERMANOVA (por Lugar)
-adonis2(d ~ Lugar, data = matriz.sitio, permutations = 999)
-
-# Chequeo de dispersión (muy recomendado)
-bd <- betadisper(dist_matrix, matriz.sitio$periodo)
-permutest(bd, permutations = 999)
-
-figura4 <- ggplot(nmds_coords, aes(x = NMDS1, y = NMDS2, color = Mes , pch=Lugar)) +
+ggplot(nmds_coords, aes(x = NMDS1, y = NMDS2, color = Lugar, pch=periodo)) +
   # Ejes en el origen
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray80") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray80") +
   
   # Elipses de confianza (95%)
-  # stat_ellipse(geom = "polygon", alpha = 0.15, color = NA,   level = 0.67,) +
+  stat_ellipse(geom = "polygon", alpha = 0.15, color = NA) +
   
   # Puntos
   geom_point(size = 3) +
@@ -183,8 +144,3 @@ figura4 <- ggplot(nmds_coords, aes(x = NMDS1, y = NMDS2, color = Mes , pch=Lugar
   theme_minimal() +
   theme(panel.grid = element_blank(),
         axis.line = element_line(color = "black"))
-
-
-png("Figura4.png", width = 800, height = 600)
-figura4
-dev.off()
