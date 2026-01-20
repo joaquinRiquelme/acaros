@@ -56,10 +56,11 @@ links <- data.frame(
   value = c(10,8,6,12,15,7) # Abundancia aproximada
 )
 
-sankeyNetwork(Links = links, Nodes = nodes, Source = "source", Target = "target",
+aaa <- sankeyNetwork(Links = links, Nodes = nodes, Source = "source", Target = "target",
               Value = "value", NodeID = "name", fontSize = 12, nodeWidth = 30)
-
-
+png("Figura2.png", width = 800,height = 600)
+aaa
+dev.off()
 
 # preambulo
 library(readxl)
