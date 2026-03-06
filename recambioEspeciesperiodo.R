@@ -77,6 +77,11 @@ head(acaros)
 acaros$id <- paste(acaros$Lugar, acaros$Mes, sep="-")
 acaros$Lugar[acaros$Lugar=="pnm"] <- "PNM"
 acaros$Lugar[acaros$Lugar=="pns"] <- "PNS"
+acaros$periodo <- 1
+acaros$periodo[acaros$Mes ==3 | acaros$Mes ==4] <- 2
+acaros$periodo[acaros$Mes ==5 | acaros$Mes ==6] <- 3
+
+
 # columna morfoespecie a partir de la columna genero y cambiando los espacios por puntos 
 acaros$morfoespecie <-acaros$Genero
 acaros$morfoespecie <- gsub(pattern = " ", replacement = ".", x = acaros$morfoespecie)
@@ -85,7 +90,7 @@ head(acaros)
 acaros$Familia[acaros$Superfamilia=="Bdellidae"] <- "Bdellidae"
 
 # abundancia por sitio, se suman las colectas de los dos tipos de muestreo
-n.familia <- acaros |> group_by(Lugar, Mes, Familia) |> 
+n.familia <- acaros |> group_by(Lugar, periodo, Familia) |> 
   summarise(abundancia = sum(cantidad, na.rm=TRUE))
 head(n.familia)
 
@@ -93,64 +98,65 @@ head(n.familia)
 
 n.familia$Familia[n.familia$Familia=="Laelapidae (L3)"] <- "Laelapidae"
 
-total.abundancia <- n.familia |> group_by(Familia) |>
-  summarise(abun.total=sum(abundancia, na.rm = TRUE))
-total.abundancia <- total.abundancia[order(total.abundancia$abun.total, decreasing = TRUE), ]
-
-
-total.sitio <- n.familia |> group_by(Lugar, Familia) |>
-  summarise(abun.total=sum(abundancia, na.rm = TRUE))
-total.sitio.pnm <- subset(total.sitio, Lugar=="PNM")
-total.sitio.pnm <- total.sitio.pnm[order(total.sitio.pnm$abun.total, decreasing = TRUE), ]
-
-total.sitio.pns <- subset(total.sitio, Lugar=="PNS")
-total.sitio.pns <- total.sitio.pns[order(total.sitio.pns$abun.total, decreasing = TRUE), ]
 
 f.total <- sort(unique(n.familia$Familia))
 length(f.total)
 
-pnm <- subset(n.familia, Lugar =="PNM")
-f.pnm <- sort(unique(pnm$Familia))
-length(f.pnm)
+p1 <- subset(n.familia, periodo ==1)
+f.p1 <- sort(unique(p1$Familia))
+length(f.p1)
 
-pns <- subset(n.familia, Lugar =="PNS")
-f.pns <- sort(unique(pns$Familia))
-length(f.pns)
+p2 <- subset(n.familia, periodo ==2)
+f.p2 <- sort(unique(p2$Familia))
+length(f.p2)
 
-f.inter <- sort(intersect(f.pnm, f.pns))
+p3 <- subset(n.familia, periodo ==3)
+f.p3 <- sort(unique(p3$Familia))
+length(f.p3)
+
+f.inter <- sort(intersect(intersect(f.p1, f.p2), f.p3))
 length(f.inter)
 
-f.diff <- sort(union(setdiff(f.pnm, f.pns), setdiff(f.pns, f.pnm)))
+f.diff <- sort(
+  setdiff(f.total, union(union(intersect(f.p1,f.p2), intersect(f.p1, f.p3)),intersect(f.p2, f.p3))))
+
 length(f.diff)
 
-solo.pnm <- intersect(f.diff, f.pnm)
-length(solo.pnm)
+solo.p1 <- intersect(f.diff, f.p1)
+length(solo.p1)
 
-solo.pns <- intersect(f.diff, f.pns)
-length(solo.pns)
+solo.p2 <- intersect(f.diff, f.p2)
+length(solo.p2)
 
+solo.p3 <- intersect(f.diff, f.p3)
+length(solo.p3)
 
-orden <- data.frame(Familia=c(solo.pnm, f.inter, solo.pns), n.f=1:33)
+p1p2 <- setdiff(intersect(f.p1,f.p2), f.inter)
+p1p3 <- setdiff(intersect(f.p1,f.p3), f.inter)
+p2p3 <- setdiff(intersect(f.p2,f.p3), f.inter)
+
+orden <- data.frame(Familia=c(solo.p1, p1p2,  f.inter, solo.p2, p2p3, p1p3, solo.p3), n.f=1:33)
 
 n.familia.orden <- merge(n.familia, orden)
 
 n.familia <- n.familia.orden[order(n.familia.orden$n.f),]
 
 # nodes: primero los lugares, luego las familias (o todo único)
-nodes <- data.frame(name = unique(c(n.familia$Lugar, n.familia$Familia)))
+nodes <- data.frame(name = unique(c(n.familia$Familia, n.familia$periodo)))
 
 # links con índices 0-based (IMPORTANTE para networkD3)
+# n.familia12 <- subset(n.familia, periodo==1|periodo==2)
 links <- data.frame(
-  source = match(n.familia$Lugar,   nodes$name) - 1,
+  source = match(n.familia$periodo,   nodes$name) - 1,
   target = match(n.familia$Familia, nodes$name) - 1,
   value  = n.familia$abundancia
 )
 
-png("Sankey.png")
+png("Sankeyperiodo.png")
 sankeyNetwork(
   Links = links, Nodes = nodes,nodePadding = 15,
   Source = "source", Target = "target",
-  Value = "value", NodeID = "name",
+  Value = "value", NodeID = "name", iteration =0,
   fontSize = 18, nodeWidth = 80, sinksRight =FALSE
 )
 dev.off()
@@ -158,8 +164,9 @@ dev.off()
 
 # diagrama de venn
 comunidades <- list(
-  Sitio_pnm = f.pnm,
-  Sitio_pns = f.pns
+  Periodo_1 = f.p1,
+  Periodo_2 = f.p2,
+  Periodo_3 = f.p3
 )
 
 install.packages("VennDiagram")

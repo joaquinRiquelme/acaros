@@ -27,6 +27,13 @@ n.id <- acaros |> group_by(id, morfoespecie) |>
   summarise(abundancia = sum(cantidad, na.rm=TRUE))
 head(n.id)
 
+# total por sitio
+total.abundancia <- n.id |> group_by(morfoespecie) |> 
+  summarise(abundancia.total = sum(abundancia, na.rm=TRUE))
+head(total.abundancia)
+
+
+
 # matriz de abundancia por cumnidades
 matriz.abundancia <- pivot_wider(data = n.id, id_cols = "id", names_from = "morfoespecie", values_from = "abundancia")
 head(matriz.abundancia)
@@ -66,6 +73,10 @@ ggplot(pcoa_coords, aes(x = PCoA1, y = PCoA2)) +
 
 
 # Permanova
+
+
+data_hel <- decostand(matriz.num, method = "hellinger")
+
 set.seed(123) # Para que los resultados sean reproducibles
 resultado_permanova_sitio <- adonis2(matriz.num ~ Lugar, 
                                data = matriz.sitio, 
@@ -73,31 +84,53 @@ resultado_permanova_sitio <- adonis2(matriz.num ~ Lugar,
                                permutations = 999)
 
 print(resultado_permanova_sitio)
+resultado_permanova_sitio <- adonis2(data_hel ~ Lugar, 
+                                     data = matriz.sitio, 
+                                     method = "bray", 
+                                     permutations = 999)
 
-resultado_permanova_mes <- adonis2(matriz.num ~ Mes, 
+print(resultado_permanova_sitio)
+
+
+
+resultado_permanova_mes <- adonis2(matriz.num ~ as.factor(Mes), 
                                data = matriz.sitio, 
                                method = "bray", 
                                permutations = 999)
 print(resultado_permanova_mes)
+
+resultado_permanova_mes <- adonis2(matriz.num ~ Mes, 
+                                   data = matriz.sitio, 
+                                   method = "bray", 
+                                   permutations = 999)
+print(resultado_permanova_mes)
+
 
 matriz.sitio$periodo <- 1
 matriz.sitio$periodo[matriz.sitio$Mes ==3 | matriz.sitio$Mes ==4] <- 2
 matriz.sitio$periodo[matriz.sitio$Mes ==5 | matriz.sitio$Mes ==6] <- 3
 
 resultado_permanova_periodo <- adonis2(matriz.num ~ periodo, 
-                                   data = matriz.sitio, 
-                                   method = "bray", 
-                                   permutations = 999)
+                                       data = matriz.sitio, 
+                                       method = "bray", 
+                                       permutations = 999)
 print(resultado_permanova_periodo)
 
-resultado_permanova_lugar_mes <- adonis2(matriz.num ~ Lugar+Mes, 
-                                   data = matriz.sitio, 
-                                   method = "bray", 
-                                   permutations = 999)
+resultado_permanova_periodo <- adonis2(data_hel ~ periodo, 
+                                       data = matriz.sitio, 
+                                       method = "bray", 
+                                       permutations = 999)
+print(resultado_permanova_periodo)
+
+
+resultado_permanova_lugar_mes <- adonis2(data_hel ~ Lugar+Mes, 
+                                         data = matriz.sitio, 
+                                         method = "bray", 
+                                         permutations = 999)
 
 print(resultado_permanova_lugar_mes)
 
-resultado_permanova_mes_lugar <- adonis2(matriz.num ~ Mes+Lugar, 
+resultado_permanova_mes_lugar <- adonis2(data_hel ~ Mes+Lugar, 
                                          data = matriz.sitio, 
                                          method = "bray", 
                                          permutations = 999)
@@ -105,7 +138,7 @@ resultado_permanova_mes_lugar <- adonis2(matriz.num ~ Mes+Lugar,
 print(resultado_permanova_mes_lugar)
 
 # nmds
-nmds <- metaMDS(matriz.num, distance = "bray", k = 2, trymax = 200, autotransform = FALSE)
+nmds <- metaMDS(data_hel, distance = "bray", k = 2, trymax = 200, autotransform = FALSE)
 nmds
 nmds$stress
 scores_nmds <- as.data.frame(scores(nmds, display = "sites"))
@@ -145,7 +178,7 @@ nmds_coords$Lugar <- matriz.sitio$Lugar
 library(vegan)
 
 # matriz de comunidad (muestras x taxa)
-comm <- matriz.num
+comm <- data_hel
 
 # distancia (ej. Bray)
 d <- vegdist(comm, method = "bray")
@@ -158,16 +191,25 @@ nmds <- metaMDS(comm, distance = "bray", k = 2, trymax = 200)
 adonis2(d ~ Lugar, data = matriz.sitio, permutations = 999)
 
 # Chequeo de dispersión (muy recomendado)
-bd <- betadisper(dist_matrix, matriz.sitio$periodo)
-permutest(bd, permutations = 999)
+bd <- betadisper(d, matriz.sitio$periodo)
+boxplot(bd, permutations = 999)
 
-figura4 <- ggplot(nmds_coords, aes(x = NMDS1, y = NMDS2, color = Mes , pch=Lugar)) +
+bd.mes <- betadisper(d, matriz.sitio$Mes)
+boxplot(bd.mes, permutations = 999)
+
+bd.lugar <- betadisper(d, matriz.sitio$Lugar)
+boxplot(bd.lugar, permutations = 999)
+
+bd.id <- betadisper(d, matriz.sitio$id)
+
+
+figura4 <- ggplot(nmds_coords, aes(x = NMDS1, y = NMDS2, color = Lugar , pch=periodo)) +
   # Ejes en el origen
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray80") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray80") +
   
   # Elipses de confianza (95%)
-  # stat_ellipse(geom = "polygon", alpha = 0.15, color = NA,   level = 0.67,) +
+  stat_ellipse(geom = "polygon", alpha = 0.15, color = NA,   level = 0.67,) +
   
   # Puntos
   geom_point(size = 3) +
@@ -185,6 +227,9 @@ figura4 <- ggplot(nmds_coords, aes(x = NMDS1, y = NMDS2, color = Mes , pch=Lugar
         axis.line = element_line(color = "black"))
 
 
-png("Figura4.png", width = 800, height = 600)
+png("Figura4.png", width = 640, height = 480)
 figura4
 dev.off()
+
+
+# beta-diversidad en Bray y Jaccard, y particiona Jaccard en turnover vs nestedness;
